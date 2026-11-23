@@ -5,7 +5,7 @@
 <meta name="theme-color" content="#102a2a"><meta name="apple-mobile-web-app-capable" content="yes">
 <title>Turni di Servizio</title><link rel="stylesheet" href="style.css">
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icona-192.png">
-<script src="app.js?v=3" defer></script>
+<script src="app.js?v=6" defer></script>
 </head>
 <body>
 <header class="top"><div class="shell top-inner">
@@ -40,7 +40,7 @@
 <dialog id="editor"><form id="shift"><div class="panel-head"><h2 id="editor-title">Nuovo turno</h2><button id="close" type="button" aria-label="Chiudi">×</button></div>
 <div class="fields"><label>Data<input type="date" name="date" required></label><label>Tipo<select name="type" required></select></label><label>Stato<select name="status"><option value="done">Registrato</option><option value="plan">Programmato</option></select></label></div>
 <div class="fields"><label>Causale<input name="reason" maxlength="200" placeholder="Scrivi la causale"></label><label>Con chi lavori<input name="colleagues" maxlength="300" placeholder="Nomi o iniziali dei colleghi"></label></div>
-<fieldset id="hours"><legend>Orario previsto</legend>
+<fieldset id="hours"><legend>1. Fascia oraria prevista</legend>
 <label class="check"><input name="automatic" type="checkbox"> Calcola lo straordinario dagli orari</label>
 <div id="planned">
 <label>Fascia oraria<select name="preset"><option value="">Personalizzato</option><option value="08:00/20:00">08:00–20:00</option><option value="08:00/14:00">08:00–14:00</option><option value="14:00/20:00">14:00–20:00</option></select></label>
@@ -48,9 +48,9 @@
 <label class="check"><input name="plannedOvernight" type="checkbox"> Fine prevista il giorno successivo</label>
 <label>Festività locale (facoltativa)<input name="localHoliday" type="date"></label>
 </div></fieldset>
-<fieldset id="actual"><legend>Servizio effettivo</legend><div class="fields"><label>Inizio effettivo<input name="start" type="time" required></label><label>Fine effettiva<input name="end" type="time" required></label><label>Pausa (min)<input name="pause" type="number" min="0" max="1439" step="1"></label></div><label class="check"><input name="overnight" type="checkbox"> Fine effettiva il giorno successivo</label>
+<fieldset id="actual"><legend>2. Orario effettivo di servizio</legend><div class="fields"><label>Inizio effettivo<input name="start" type="time" required></label><label>Fine effettiva<input name="end" type="time" required></label><label>Pausa (min)<input name="pause" type="number" min="0" max="1439" step="1"></label></div><label class="check"><input name="overnight" type="checkbox"> Fine effettiva il giorno successivo</label>
 <label id="break-start">Inizio pausa effettiva<input name="breakStart" type="time"></label>
-<p id="overtime" aria-live="polite"></p>
+<div id="overtime" aria-live="polite"></div>
 </fieldset>
 <details id="pay"><summary>Straordinario e indennità</summary><div id="pay-inputs" class="fields"></div><p class="muted">Indica le quantità spettanti per le altre indennità. Lo straordinario automatico misura il servizio fuori dall’orario previsto, al netto della pausa. Le ore notturne vanno dalle 22:00 alle 06:00. Il calendario considera domeniche e festività nazionali. Per giorni locali aggiungi la data della festività. Per reperibilità e cambio turno è disponibile il profilo FESI 2025. Per altre annualità usa il lordo da liquidazione.</p></details>
 <details id="meals"><summary>Pasti e ticket</summary>
@@ -59,7 +59,7 @@
 <label>Rimborso netto totale (€)<input name="mealNet" type="number" min="0" max="100000" step=".01"></label></div>
 <div class="fields"><label>Ticket pasto<input name="tickets" type="number" min="0" max="20" step="1"></label>
 <label>Valore per ticket (€)<input name="ticketValue" type="number" min="0" max="100000" step=".01" required></label></div>
-<p class="muted">Inserisci le quantità riconosciute. Il valore dei ticket è riepilogato a parte. Per il rimborso del pasto non fruito puoi registrare la quantità ora e aggiungere gli importi quando li conosci.</p></details>
+<p class="muted">Inserisci le quantità riconosciute. Il valore dei ticket è riepilogato a parte. Per il rimborso del pasto non fruito puoi registrare la quantità e inserire gli importi che conosci, anche solo il netto.</p></details>
 <details id="manual"><summary>Importi da cedolino o liquidazione</summary><div class="fields"><label>Descrizione<input name="manualLabel" maxlength="120" placeholder="Es. diaria missione"></label><label>Lordo (€)<input name="manualGross" type="number" min="0" max="100000" step=".01"></label><label>Netto effettivo (€)<input name="manualNet" type="number" min="0" max="100000" step=".01"></label></div><p class="muted">Voce aggiuntiva. Se lasci vuoto il netto, serve la percentuale per straordinari e indennità.</p></details>
 <label>Note<textarea name="note" maxlength="4000" rows="2"></textarea></label>
 <output id="preview"></output><p id="error" role="alert"></p>

@@ -62,9 +62,8 @@ function validateShift(s) {
   }
   if (!text(s.reason,200) || !text(s.colleagues,300) || !inRange(s.missedMeals,20) ||
       !inRange(s.tickets,20) || !inRange(s.ticketValue,10000000) || !inRange(s.mealGross,10000000) ||
-      (s.mealNet!==null && !inRange(s.mealNet,s.mealGross))) throw new Error('Controlla i dati di pasti, ticket o causale.');
+      (s.mealNet!==null && !inRange(s.mealNet,s.mealGross||10000000))) throw new Error('Controlla i dati di pasti, ticket o causale.');
   if (!s.missedMeals && (s.mealGross || s.mealNet!==null)) throw new Error('Indica il numero di pasti non fruiti.');
-  if (s.mealNet!==null && !s.mealGross) throw new Error('Inserisci anche il rimborso lordo dei pasti.');
   if (s.manualNet !== null && s.manualGross === 0) throw new Error('Inserisci il lordo della voce da cedolino.');
   if (rates.some(r=>s.quantities[r.id] && !applicable(r,s.date))) throw new Error('Tariffa non applicabile alla data selezionata.');
   if (noHours.has(s.type)) {
@@ -162,27 +161,44 @@ function pauseStart(s) {
   return start<clock(s.start)?start+1440:start;
 }
 
-function automaticOvertime(s) {
-  const totals=[0,0,0,0];
-  if (!s.plannedStart || !s.plannedEnd || noHours.has(s.type) || s.status==='plan') return totals;
+function serviceBreakdown(s) {
+  const result={regular:0, before:[0,0,0,0], after:[0,0,0,0]};
+  if (!s.plannedStart || !s.plannedEnd || noHours.has(s.type) || s.status==='plan') return result;
   const expectedStart=clock(s.plannedStart);
   const expectedEnd=clock(s.plannedEnd)+(s.plannedOvernight?1440:0);
   const effectiveEnd=clock(s.end)+(s.overnight?1440:0);
   const pause=s.pause&&s.breakStart?pauseStart(s):Infinity;
   const holidays=[holiday(s.date,s.localHoliday),holiday(nextDay(s.date),s.localHoliday)];
   for (let minute=clock(s.start);minute<effectiveEnd;minute++) {
-    if ((minute>=expectedStart && minute<expectedEnd) || (minute>=pause && minute<pause+s.pause)) continue;
+    if (minute>=pause && minute<pause+s.pause) continue;
+    if (minute>=expectedStart && minute<expectedEnd) {
+      result.regular++;
+      continue;
+    }
     const time=minute%1440;
     const night=time<360||time>=1320;
     const festivo=holidays[Math.floor(minute/1440)];
-    totals[(festivo?2:0)+(night?1:0)]++;
+    const period=minute<expectedStart?result.before:result.after;
+    period[(festivo?2:0)+(night?1:0)]++;
   }
-  return totals;
+  if (s.pause && !s.breakStart) result.regular-=s.pause;
+  return result;
+}
+
+function automaticOvertime(s) {
+  const {before,after}=serviceBreakdown(s);
+  return before.map((minutes,i)=>minutes+after[i]);
 }
 
 function overtimeText(s) {
-  if (!s.plannedStart || noHours.has(s.type) || s.status==='plan') return '';
-  return automaticOvertime(s).map((minutes,i)=>overtimeNames[i]+' '+duration(minutes)).join(' · ');
+  if (!s.plannedStart || noHours.has(s.type) || s.status==='plan') return [];
+  const {regular,before,after}=serviceBreakdown(s);
+  const periodText=(label,categories)=>{
+    const total=categories.reduce((a,b)=>a+b,0);
+    const detail=categories.flatMap((minutes,i)=>minutes?[overtimeNames[i]+' '+duration(minutes)]:[]);
+    return label+' '+duration(total)+(detail.length?' · '+detail.join(' · '):'');
+  };
+  return ['Turno regolare '+duration(regular),periodText('Anticipo',before),periodText('Posticipo',after)];
 }
 
 function extraMinutes(s) {
@@ -205,12 +221,12 @@ function pay(s) {
   });
   if (s.manualGross) lines.push({label:s.manualLabel||'Voce da liquidazione',gross:s.manualGross,
     net:s.manualNet??netEstimate(s.manualGross,'ordinario')});
-  if (s.mealGross) lines.push({label:'Rimborso pasti non fruiti',gross:s.mealGross,net:s.mealNet});
+  if (s.mealGross || s.mealNet!==null) lines.push({label:'Rimborso pasti non fruiti',gross:s.mealGross||null,net:s.mealNet});
   const total = sum(lines);
   return {...total,lines};
 }
 function sum(items) {
-  return {gross:items.reduce((a,b)=>a+b.gross,0),
+  return {gross:items.some(i=>i.gross===null)?null:items.reduce((a,b)=>a+b.gross,0),
     net:items.some(i=>i.net===null)?null:items.reduce((a,b)=>a+b.net,0)};
 }
 function node(tag, content, className) {
@@ -221,7 +237,7 @@ function node(tag, content, className) {
 }
 function newShift(date) {
   return {...mealDefaults(),...overtimeDefaults(),plannedStart:'08:00',plannedEnd:'14:00',id:typeof crypto.randomUUID==='function'?crypto.randomUUID():crypto.getRandomValues(new Uint32Array(4)).join('-'),
-    date,type:'Ordinario',status:date>today()?'plan':'done',start:'08:00',end:'14:00',pause:0,overnight:false,
+    date,type:'Ordinario',status:'done',start:'08:00',end:'14:00',pause:0,overnight:false,
     quantities:Object.fromEntries(rates.map(r=>[r.id,0])),unclassified:0,note:'',manualLabel:'',manualGross:0,manualNet:null};
 }
 function monthShifts() {
@@ -235,7 +251,7 @@ function row(s,showDate) {
   const time = noHours.has(s.type)?'':s.start+'–'+s.end+(s.overnight?' (+1 g)':'')+' · ';
   body.append(node('p',time+(s.status==='plan'?'Programmato':'Registrato'),'muted'));
   const values = pay(s);
-  if (values.gross) {
+  if (values.lines.length) {
     const detail = node('details');
     detail.append(node('summary','Lordo '+money(values.gross)+' · Netto '+money(values.net)));
     for (const line of values.lines) detail.append(node('p',line.label+' · '+money(line.gross)+' lordi · '+money(line.net)+' netti','muted'));
@@ -243,7 +259,7 @@ function row(s,showDate) {
   }
   if (s.unclassified) body.append(node('p','Straordinario da classificare: '+duration(s.unclassified),'muted'));
   if (s.plannedStart) body.append(node('p','Previsto: '+s.plannedStart+'–'+s.plannedEnd+(s.plannedOvernight?' (+1 g)':''),'muted'));
-  if (s.plannedStart && extraMinutes(s)) body.append(node('p',overtimeText(s),'muted'));
+  for (const line of overtimeText(s)) body.append(node('p',line,'muted'));
   if (s.reason) body.append(node('p','Causale: '+s.reason,'muted'));
   if (s.colleagues) body.append(node('p','Con chi lavori: '+s.colleagues,'muted'));
   if (s.missedMeals) body.append(node('p','Pasti non fruiti: '+s.missedMeals,'muted'));
@@ -340,9 +356,15 @@ function renderRates() {
 }
 function open(shift) {
   editing=shift;
+  const existing=data.shifts.some(s=>s.id===shift.id);
   form.reset();
   for (const name of ['date','type','status','start','end','pause','note','manualLabel','reason','colleagues']) form.elements[name].value=shift[name];
-  form.elements.overnight.checked=shift.overnight;
+  const hasActual=existing&&shift.status==='done';
+  if (!hasActual && shift.plannedStart) {
+    form.elements.start.value='';
+    form.elements.end.value='';
+  }
+  form.elements.overnight.checked=shift.overnight&&(!shift.plannedStart||hasActual);
   form.elements.automatic.checked=Boolean(shift.plannedStart);
   form.elements.plannedStart.value=shift.plannedStart||shift.start;
   form.elements.plannedEnd.value=shift.plannedEnd||shift.end;
@@ -358,7 +380,7 @@ function open(shift) {
   form.elements.manualNet.value=shift.manualNet===null?'':shift.manualNet/100;
   for (const r of rates) form.elements[r.id].value=shift.quantities[r.id]||'';
   form.elements.unclassified.value=shift.unclassified||'';
-  $('editor-title').textContent=data.shifts.some(s=>s.id===shift.id)?'Modifica turno':'Nuovo turno';
+  $('editor-title').textContent=existing?'Modifica turno':'Nuovo turno';
   $('delete').hidden=$('editor-title').textContent==='Nuovo turno';
   $('manual').open=Boolean(shift.manualGross);
   $('pay').open=Boolean(shift.unclassified||Object.values(shift.quantities).some(Boolean)||shift.type==='Reperibilità');
@@ -412,11 +434,21 @@ function preview() {
   }
   values.unclassified.parentElement.hidden=noService || automatic || (!editing.unclassified&&!values.unclassified.value);
   values.unclassified.disabled=values.unclassified.parentElement.hidden;
+  if (!$('actual').hidden && (!values.start.value || !values.end.value)) {
+    $('preview').textContent='';
+    $('error').textContent='';
+    if (automatic) $('overtime').textContent='Inserisci inizio e fine effettivi per calcolare lo straordinario.';
+    return;
+  }
   try {
     const s=readForm();
     validateShift(s);
     const totals=pay(s);
-    $('overtime').textContent=overtimeText(s);
+    const breakdown=overtimeText(s);
+    if (breakdown.length) $('overtime').replaceChildren(
+      node('strong','Straordinario totale '+duration(extraMinutes(s))),
+      ...breakdown.map(line=>node('div',line))
+    );
     $('error').textContent='';
     $('preview').textContent=[!noService?duration(netMinutes(s))+' di servizio':'',
       'Lordo '+money(totals.gross),'Netto '+money(totals.net)].filter(Boolean).join(' · ');
@@ -441,13 +473,16 @@ function download(name,type,contents) {
 }
 function csv() {
   const headers=['Data','Tipo','Stato','Inizio','Fine','Giorno dopo','Pausa min','Servizio min',
-    'Straordinario min','Straordinario da classificare min','Lordo EUR','Netto EUR','Voci','Causale','Con chi lavori','Pasti non fruiti','Rimborso pasti lordo EUR','Rimborso pasti netto EUR','Ticket pasto','Valore ticket unitario EUR','Valore ticket totale EUR','Note','Inizio previsto','Fine prevista','Previsto giorno dopo','Inizio pausa','Festività locale',...overtimeNames.map(name=>name+' min')];
+    'Straordinario min','Straordinario da classificare min','Lordo EUR','Netto EUR','Voci','Causale','Con chi lavori','Pasti non fruiti','Rimborso pasti lordo EUR','Rimborso pasti netto EUR','Ticket pasto','Valore ticket unitario EUR','Valore ticket totale EUR','Note','Inizio previsto','Fine prevista','Previsto giorno dopo','Inizio pausa','Festività locale',...overtimeNames.map(name=>name+' min'),'Turno regolare min',
+    ...['Anticipo','Posticipo'].flatMap(period=>overtimeNames.map(name=>period+' '+name+' min'))];
   const number=cents=>cents===null?'':(cents/100).toFixed(2).replace('.',',');
   const rows=monthShifts().map(s=>{
     const amounts=pay(s);
+    const automatic=s.plannedStart&&s.status==='done';
+    const {regular,before,after}=serviceBreakdown(s);
     return [s.date,s.type,s.status==='done'?'Registrato':'Programmato',noHours.has(s.type)?'':s.start,
       noHours.has(s.type)?'':s.end,s.overnight?'Sì':'',s.pause,netMinutes(s),extraMinutes(s),s.unclassified,
-      number(amounts.gross),number(amounts.net),amounts.lines.map(l=>l.label+': '+number(l.gross)).join(' | '),s.reason,s.colleagues,s.missedMeals,number(s.mealGross),number(s.mealNet),s.tickets,number(s.ticketValue),number(s.tickets*s.ticketValue),s.note,s.plannedStart,s.plannedEnd,s.plannedOvernight?'Sì':'',s.breakStart,s.localHoliday,...(s.plannedStart&&s.status==='done'?automaticOvertime(s):['','','',''])];
+      number(amounts.gross),number(amounts.net),amounts.lines.map(l=>l.label+': '+number(l.gross)).join(' | '),s.reason,s.colleagues,s.missedMeals,number(s.mealGross||null),number(s.mealNet),s.tickets,number(s.ticketValue),number(s.tickets*s.ticketValue),s.note,s.plannedStart,s.plannedEnd,s.plannedOvernight?'Sì':'',s.breakStart,s.localHoliday,...(automatic?[...automaticOvertime(s),regular,...before,...after]:Array(13).fill(''))];
   });
   const escape=value=>{
     const string=String(value);
@@ -485,6 +520,8 @@ form.oninput=event=>{
     [values.plannedStart.value,values.plannedEnd.value]=values.preset.value.split('/');
     values.plannedOvernight.checked=false;
   }
+  if ((event.target===values.start || event.target===values.end) && values.start.value && values.end.value &&
+      values.start.value!==values.end.value) values.overnight.checked=values.end.value<values.start.value;
   if (event.target!==values.preset || values.preset.value) preview();
 };
 form.onsubmit=event=>{
