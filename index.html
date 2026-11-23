@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#102a2a"><meta name="apple-mobile-web-app-capable" content="yes">
+<title>Turni di Servizio</title><link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icona-192.png">
+<script src="app.js?v=3" defer></script>
+</head>
+<body>
+<header class="top"><div class="shell top-inner">
+<a class="brand" href="./"><img src="icona-192.png" alt=""> <span>Turni di Servizio</span></a>
+<nav aria-label="Sezioni"><button data-view="cal" aria-current="page">Calendario</button><button data-view="reg">Registro</button><button data-view="tar">Tariffe</button><button data-view="arch">Archivio</button></nav>
+</div></header>
+<main class="shell">
+<section class="hero"><div><p class="eyebrow">POLIZIA DI STATO · VICE SOVRINTENDENTE</p><h1 id="title">Calendario di servizio</h1><p id="subtitle"></p></div><button id="new" class="primary">＋ Nuovo turno</button></section>
+<section id="month-content">
+<div class="monthbar"><div><span class="eyebrow">MESE DI SERVIZIO</span><h2 id="month"></h2></div><div class="actions"><button id="today">Oggi</button><button id="prev" aria-label="Mese precedente">‹</button><button id="next" aria-label="Mese successivo">›</button></div></div>
+<div id="metrics" class="metrics"></div>
+<div id="calendar" class="columns"><section class="panel"><h2>Calendario</h2><div class="week" aria-hidden="true"><span>Lun</span><span>Mar</span><span>Mer</span><span>Gio</span><span>Ven</span><span>Sab</span><span>Dom</span></div><div id="grid" class="grid"></div></section><section class="panel"><div class="panel-head"><h2 id="selected"></h2><button id="add-day" aria-label="Aggiungi turno per questo giorno">＋</button></div><div id="day-list"></div></section></div>
+<section id="register" class="panel" hidden><div class="panel-head"><h2>Turni del mese</h2><button id="csv">Esporta CSV</button></div><div class="filters"><label>Cerca<input id="search" type="search" placeholder="Tipo, causale, colleghi o note"></label><label>Tipo<select id="filter"></select></label></div><div id="rows"></div></section>
+</section>
+<section id="tariffs" class="panel" hidden>
+<div class="panel-head"><h2>Importi unitari</h2></div>
+<p>Le tariffe si applicano alle quantità che confermi nella scheda turno, secondo la spettanza. I compensi FESI dipendono dall’annualità. Per le voci future o variabili puoi inserire un importo da cedolino o liquidazione.</p>
+<div class="scroll"><table><thead><tr><th scope="col">Voce</th><th scope="col">Lordo</th><th scope="col">Netto stimato</th><th scope="col">Fonte</th></tr></thead><tbody id="rates"></tbody></table></div>
+<p>Ticket pasto: valore nominale di riferimento €7,00, modificabile per turno. Il rimborso per pasto non fruito si inserisce da liquidazione. <a href="https://siulp.it/i-tuoi-diritti/trattamento-economico-accessorio/" target="_blank" rel="noopener noreferrer">Riferimenti sul buono pasto</a>.</p>
+<p>Per cambio turno e reperibilità consulta anche gli articoli 11 e 18 dell’<a href="https://olympus.uniurb.it/index.php?Itemid=139&amp;catid=43&amp;id=32563%3Aps3172009&amp;option=com_content&amp;view=article" target="_blank" rel="noopener noreferrer">Accordo nazionale quadro del 31 luglio 2009</a>.</p>
+<p class="muted">I netti dipendono dalle trattenute personali. Inserisci in Archivio una percentuale effettiva complessiva per il tipo di compenso. La stima usa lordo × (1 − percentuale / 100).</p>
+</section>
+<section id="archive" class="panel" hidden>
+<h2>Trattenute per la stima del netto</h2>
+<form id="preferences"><div class="filters"><label>Straordinari e indennità (%)<input name="ordinario" type="number" min="0" max="100" step=".01" placeholder="Da cedolino"></label><label>Compensi FESI (%)<input name="fesi" type="number" min="0" max="100" step=".01" placeholder="Da cedolino"></label><button class="primary">Salva impostazioni</button></div></form>
+<h2>Backup del registro</h2><p>I dati restano nel browser su questo dispositivo e per questo indirizzo web. Usa il backup per trasferirli tra Mac e iPhone o tra indirizzi Netlify.</p>
+<div class="actions"><button id="backup">Scarica backup JSON</button><button id="restore">Ripristina backup</button><input hidden id="file" type="file" accept=".json,application/json"></div>
+<p class="muted">Il ripristino sostituisce l’archivio corrente dopo conferma. È compatibile anche con i backup JSON della prima versione Mac.</p>
+</section>
+<p id="status" role="status" aria-live="polite"></p>
+</main>
+<dialog id="editor"><form id="shift"><div class="panel-head"><h2 id="editor-title">Nuovo turno</h2><button id="close" type="button" aria-label="Chiudi">×</button></div>
+<div class="fields"><label>Data<input type="date" name="date" required></label><label>Tipo<select name="type" required></select></label><label>Stato<select name="status"><option value="done">Registrato</option><option value="plan">Programmato</option></select></label></div>
+<div class="fields"><label>Causale<input name="reason" maxlength="200" placeholder="Scrivi la causale"></label><label>Con chi lavori<input name="colleagues" maxlength="300" placeholder="Nomi o iniziali dei colleghi"></label></div>
+<fieldset id="hours"><legend>Orario previsto</legend>
+<label class="check"><input name="automatic" type="checkbox"> Calcola lo straordinario dagli orari</label>
+<div id="planned">
+<label>Fascia oraria<select name="preset"><option value="">Personalizzato</option><option value="08:00/20:00">08:00–20:00</option><option value="08:00/14:00">08:00–14:00</option><option value="14:00/20:00">14:00–20:00</option></select></label>
+<div class="fields"><label>Inizio previsto<input name="plannedStart" type="time" required></label><label>Fine prevista<input name="plannedEnd" type="time" required></label></div>
+<label class="check"><input name="plannedOvernight" type="checkbox"> Fine prevista il giorno successivo</label>
+<label>Festività locale (facoltativa)<input name="localHoliday" type="date"></label>
+</div></fieldset>
+<fieldset id="actual"><legend>Servizio effettivo</legend><div class="fields"><label>Inizio effettivo<input name="start" type="time" required></label><label>Fine effettiva<input name="end" type="time" required></label><label>Pausa (min)<input name="pause" type="number" min="0" max="1439" step="1"></label></div><label class="check"><input name="overnight" type="checkbox"> Fine effettiva il giorno successivo</label>
+<label id="break-start">Inizio pausa effettiva<input name="breakStart" type="time"></label>
+<p id="overtime" aria-live="polite"></p>
+</fieldset>
+<details id="pay"><summary>Straordinario e indennità</summary><div id="pay-inputs" class="fields"></div><p class="muted">Indica le quantità spettanti per le altre indennità. Lo straordinario automatico misura il servizio fuori dall’orario previsto, al netto della pausa. Le ore notturne vanno dalle 22:00 alle 06:00. Il calendario considera domeniche e festività nazionali. Per giorni locali aggiungi la data della festività. Per reperibilità e cambio turno è disponibile il profilo FESI 2025. Per altre annualità usa il lordo da liquidazione.</p></details>
+<details id="meals"><summary>Pasti e ticket</summary>
+<div class="fields"><label>Pasti non fruiti<input name="missedMeals" type="number" min="0" max="20" step="1"></label>
+<label>Rimborso lordo totale (€)<input name="mealGross" type="number" min="0" max="100000" step=".01"></label>
+<label>Rimborso netto totale (€)<input name="mealNet" type="number" min="0" max="100000" step=".01"></label></div>
+<div class="fields"><label>Ticket pasto<input name="tickets" type="number" min="0" max="20" step="1"></label>
+<label>Valore per ticket (€)<input name="ticketValue" type="number" min="0" max="100000" step=".01" required></label></div>
+<p class="muted">Inserisci le quantità riconosciute. Il valore dei ticket è riepilogato a parte. Per il rimborso del pasto non fruito puoi registrare la quantità ora e aggiungere gli importi quando li conosci.</p></details>
+<details id="manual"><summary>Importi da cedolino o liquidazione</summary><div class="fields"><label>Descrizione<input name="manualLabel" maxlength="120" placeholder="Es. diaria missione"></label><label>Lordo (€)<input name="manualGross" type="number" min="0" max="100000" step=".01"></label><label>Netto effettivo (€)<input name="manualNet" type="number" min="0" max="100000" step=".01"></label></div><p class="muted">Voce aggiuntiva. Se lasci vuoto il netto, serve la percentuale per straordinari e indennità.</p></details>
+<label>Note<textarea name="note" maxlength="4000" rows="2"></textarea></label>
+<output id="preview"></output><p id="error" role="alert"></p>
+<div class="editor-actions"><button id="delete" type="button" class="danger">Elimina</button><span></span><button id="cancel" type="button">Annulla</button><button class="primary">Salva turno</button></div>
+</form></dialog>
+</body></html>
