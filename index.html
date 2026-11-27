@@ -5,7 +5,8 @@
 <meta name="theme-color" content="#102a2a"><meta name="apple-mobile-web-app-capable" content="yes">
 <title>Turni di Servizio</title><link rel="stylesheet" href="style.css">
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icona-192.png">
-<script src="app.js?v=6" defer></script>
+<script src="app.js?v=7" defer></script>
+<script src="sync.js?v=1" defer></script>
 </head>
 <body>
 <header class="top"><div class="shell top-inner">
@@ -31,7 +32,23 @@
 <section id="archive" class="panel" hidden>
 <h2>Trattenute per la stima del netto</h2>
 <form id="preferences"><div class="filters"><label>Straordinari e indennità (%)<input name="ordinario" type="number" min="0" max="100" step=".01" placeholder="Da cedolino"></label><label>Compensi FESI (%)<input name="fesi" type="number" min="0" max="100" step=".01" placeholder="Da cedolino"></label><button class="primary">Salva impostazioni</button></div></form>
-<h2>Backup del registro</h2><p>I dati restano nel browser su questo dispositivo e per questo indirizzo web. Usa il backup per trasferirli tra Mac e iPhone o tra indirizzi Netlify.</p>
+<h2>Sincronizzazione iPhone e Mac</h2>
+<p>Usa lo stesso account e lo stesso progetto Supabase su entrambi i dispositivi. Causale, colleghi, note e descrizione degli importi personalizzati restano sul dispositivo.</p>
+<form id="sync-login">
+  <div class="fields">
+    <label>Project URL<input name="project" type="url" required placeholder="https://…supabase.co"></label>
+    <label>Chiave pubblicabile<input name="publishable" type="text" required placeholder="sb_publishable_…"></label>
+  </div>
+  <div class="fields">
+    <label>Email<input name="email" type="email" required autocomplete="username"></label>
+    <label>Password<input name="password" type="password" required autocomplete="current-password"></label>
+    <button class="primary">Accedi e sincronizza</button>
+  </div>
+</form>
+<div id="sync-controls" class="actions" hidden><button id="sync-now">Sincronizza ora</button><button id="sync-logout">Disconnetti</button></div>
+<p id="sync-status" role="status" aria-live="polite">Sincronizzazione da configurare.</p>
+<div id="sync-conflict" class="actions" hidden><button id="sync-local">Conserva le modifiche di questo dispositivo</button><button id="sync-remote">Conserva le modifiche online</button></div>
+<h2>Backup del registro</h2><p>Puoi scaricare una copia locale del registro. Se la sincronizzazione è attiva, il ripristino sostituisce l’archivio locale e la modifica si riflette sul registro online.</p>
 <div class="actions"><button id="backup">Scarica backup JSON</button><button id="restore">Ripristina backup</button><input hidden id="file" type="file" accept=".json,application/json"></div>
 <p class="muted">Il ripristino sostituisce l’archivio corrente dopo conferma. È compatibile anche con i backup JSON della prima versione Mac.</p>
 </section>

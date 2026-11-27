@@ -126,11 +126,12 @@ try {
   blocked = true;
   loadWarning = 'Archivio illeggibile o non accessibile. Puoi ripristinare un backup dalla sezione Archivio.';
 }
-function save(next) {
+function save(next, notify=true) {
   localStorage.setItem(key,JSON.stringify(next));
   data = next;
   blocked = false;
   loadWarning = '';
+  if (notify) window.dispatchEvent(new Event('turni-saved'));
 }
 function netMinutes(s) {
   return noHours.has(s.type)?0:clock(s.end)-clock(s.start)+(s.overnight?1440:0)-s.pause;
@@ -564,7 +565,7 @@ $('file').onchange=async event=>{
   if (!file) return;
   try {
     const imported=parse(JSON.parse(await file.text()));
-    if (!confirm('Sostituire il registro con '+imported.shifts.length+' registrazioni del backup?')) return;
+    if (!confirm('Sostituire il registro con '+imported.shifts.length+' registrazioni del backup? Se è collegato a un account, la sostituzione verrà sincronizzata.')) return;
     save(imported);
     render();
     status('Backup ripristinato.');
